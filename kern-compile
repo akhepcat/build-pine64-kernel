@@ -95,4 +95,17 @@ cp arch/arm64/boot/dts/sun50i-a64-pine64-plus.dtb arch/arm64/boot/Image /boot/k0
 update-initramfs -c -k ${kver} -b /boot/k0${kb}/
 mv /boot/k0${kb}/initrd.img-${kver} /boot/k0${kb}/initrd.img
 
+##  adjust the /boot/uEnv.txt
+
+if [ -e /boot/uEnv.txt ]
+then
+	echo "About to fixup /boot/uEnv.txt, ctrl-c to abort this auto-updating"
+	read waiting
+fi
+
+sed -i "s/\(kernel_filename\)=.*/\1=${kb}\/Image/gi; s/\(initrd_filename\)=.*/\1=${kb}\/initrd.img/gi;" /boot/uEnv.txt
+[[ -z "$(grep fdt_filename_prefix /boot/uEnv.txt)" ]] \
+	&& sed -i "s/\(fdt_filename_prefix\)=.*/\1=${kb}\/sun50i-a64-/gi;" /boot/uEnv.txt \
+	|| echo "fdt_filename_prefix=${kb}/sun50i-a64-" >> /boot/uEnv.txt
+
 echo "completed"

@@ -1,0 +1,98 @@
+#!/bin/bash
+DATE=$(date '+%Y%m%d%H%M')
+ARGS=${1}
+
+cd /usr/src/
+
+if [ ! -e /usr/src/linux-pine64/.git/config ]
+then
+	echo "no current linux repository, cloning may take some time."
+	git clone --depth 1 --single-branch -b pine64-hacks-1.2 https://github.com/longsleep/linux-pine64
+	ARGS="update"
+fi
+
+cd /usr/src/linux-pine64
+
+if [ "$ARGS" = "update" ]
+then
+	[[ -e .config ]] && make mrproper
+	git pull
+
+	echo "ctrl-z, run 'git checkout -b \${branch}' here, then fg and 'enter' to continue."
+	read waiting
+
+	echo "ctrl-z, and run either 'make sun50iw1p1smp_linux_defconfig' or copy a saved config here as .config, run 'make oldconfig', then fg and 'enter' to continue."
+	read waiting
+else
+	echo "skipping update ('$0 update' to force a new kernel) and starting to build"
+fi
+
+test -e /usr/src/linux-pine64/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts || \
+	curl -sSL https://github.com/longsleep/build-pine64-image/raw/master/blobs/pine64.dts > /usr/src/linux-pine64/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts
+
+
+make -j 4 Image sun50i-a64-pine64-plus.dtb modules
+
+if [ 0 -ne $? ]
+then
+   echo "Make broke.  fix and resume manually"
+fi
+
+make modules_install
+if [ 0 -ne $? ]
+then
+   echo "Make (modules_install) broke.  fix and resume manually"
+fi
+make firmware_install
+if [ 0 -ne $? ]
+then
+   echo "Make (firmware_install) broke.  fix and resume manually"
+fi
+
+# this really doesn't need to be updated except for major revision changes.
+# so... a difference of 100 in the kernel version, maybe?
+
+if [ -e /usr/include/linux/version.h ]
+then
+	OLDV=$(grep LINUX_VERSION_CODE /usr/include/linux/version.h | awk '{print $3}')
+	NEWV=$(grep LINUX_VERSION_CODE /usr/src/linux-pine64/include/generated/uapi/linux/version.h | awk '{print $3}')
+	DIFF=$(( ${NEWV:-0} - ${OLDV:-0} ))
+	#negatives mean older, but bash math, so normalize to zero.
+	DIFF=${DIFF##-*}
+	
+	if [ ${NEWV:-0} -gt ${OLDV:-0}   -a   ${DIFF:-0} -gt 100 ]
+	then
+		make headers_install INSTALL_HDR_PATH=/usr
+	fi
+else
+	# if there's no linux include directory, we install it forcefully
+	make headers_install INSTALL_HDR_PATH=/usr
+fi
+
+kver=$( make kernelrelease )
+kb=${kver//\./}
+kb=${kb//-pine64}
+kb=${kb//-/.}
+
+test -e .config && cp .config /usr/src/config-pine64-${kver}-${DATE}
+
+# and install it...
+if [ -z "$(mount | grep boot)" ]
+then
+	echo "/boot not mounted: ctrl-z, 'mount /boot', then fg and 'enter' to continue."
+	read waiting
+fi
+
+mkdir /boot/k0${kb}
+FREE=$(df -k /boot/ | awk '/boot/ {print $4}')
+if [ ${FREE:-0} -lt 20000 ]
+then
+	echo "not enough free space in /boot: ctrl-z, clean up space, then fg and 'enter' to continue."
+	read waiting
+fi
+
+cp arch/arm64/boot/dts/sun50i-a64-pine64-plus.dtb arch/arm64/boot/Image /boot/k0${kb}/
+update-initramfs -c -k ${kver} -b /boot/k0${kb}/
+mv /boot/k0${kb}/initrd.img-${kver} /boot/k0${kb}/initrd.img
+
+echo "completed"

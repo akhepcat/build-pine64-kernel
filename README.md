@@ -4,15 +4,15 @@ simple script to manage building longsleep's pine64 kernel
 simple method is to just run this script in /usr/src, and it'll
 automatically fetch the latest git repo of the kernel.
 
-    \# cd /usr/src
-    \# kern-compile
+    # cd /usr/src
+    # kern-compile
 
 It will pause for you to select a branch prior to configuration.
 
 you can also force the script to update the repo with the command-line
 option "update"
 
-    \# kern-compile update
+    # kern-compile update
 
 
 Next, the script will check for the existance of a configuration file,
@@ -23,7 +23,7 @@ Once these steps are complete, the build starts.
 The script will default to using all available cores during the build
 process, but you can restrict it as follows:
 
-    \# kern-compile CPUS=3
+    # kern-compile CPUS=3
 
 if the build is successfull, it will attempt to install
 the modules and firmware into the default places.

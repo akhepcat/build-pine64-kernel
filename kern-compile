@@ -29,16 +29,20 @@ cd /usr/src/linux-pine64
 
 if [ -z "${ARGS##*update*}" ]
 then
-	[[ -e .config ]] && make mrproper
+	make mrproper
 	git pull
 
 	echo "ctrl-z, run 'git checkout -b \${branch}' here, then fg and 'enter' to continue."
 	read waiting
 
-	echo "ctrl-z, and run either 'make sun50iw1p1smp_linux_defconfig' or copy a saved config here as .config, run 'make oldconfig', then fg and 'enter' to continue."
-	read waiting
 else
 	echo "skipping update ('$0 update' to force a new kernel) and starting to build"
+fi
+
+if [ ! -e ".config" ]
+then
+	echo "ctrl-z, and run either 'make sun50iw1p1smp_linux_defconfig' or copy a saved config here as .config, run 'make oldconfig', then fg and 'enter' to continue."
+	read waiting
 fi
 
 test -e /usr/src/linux-pine64/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts || \

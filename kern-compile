@@ -1,6 +1,20 @@
 #!/bin/bash
 DATE=$(date '+%Y%m%d%H%M')
-ARGS=${1}
+PROG="${0##*/}"
+ARGS=${*}
+DO_RETURN=${SHLVL}
+
+trap do_exit SIGINT SIGTERM SIGKILL SIGQUIT SIGABRT SIGSTOP SIGSEGV
+
+do_exit()
+{
+        STATUS=${1:-0}
+        REASON=${2}
+
+        [[ -n "${REASON}" ]] && echo "${REASON}"
+
+        [[ ${DO_RETURN} -eq 1 ]] && return $STATUS || exit $STATUS
+}
 
 cd /usr/src/
 
@@ -13,7 +27,7 @@ fi
 
 cd /usr/src/linux-pine64
 
-if [ "$ARGS" = "update" ]
+if [ -z "${ARGS##*update*}" ]
 then
 	[[ -e .config ]] && make mrproper
 	git pull
@@ -30,23 +44,33 @@ fi
 test -e /usr/src/linux-pine64/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts || \
 	curl -sSL https://github.com/longsleep/build-pine64-image/raw/master/blobs/pine64.dts > /usr/src/linux-pine64/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts
 
+CPUS=$(grep processor /proc/cpuinfo | wc -l)
+if [ -z "${ARGS##*CPUS=*}" ]
+then
+	CPUS=${ARGS##*CPUS=}
+	CPUS=${CPUS[0]}
+	CPUS=${CPUS//[^0-9]/}
+fi
 
-make -j 4 Image sun50i-a64-pine64-plus.dtb modules
+make -j${CPUS} Image sun50i-a64-pine64-plus.dtb modules
 
 if [ 0 -ne $? ]
 then
    echo "Make broke.  fix and resume manually"
+   do_exit 1
 fi
 
 make modules_install
 if [ 0 -ne $? ]
 then
    echo "Make (modules_install) broke.  fix and resume manually"
+   do_exit 1
 fi
 make firmware_install
 if [ 0 -ne $? ]
 then
    echo "Make (firmware_install) broke.  fix and resume manually"
+   do_exit 1
 fi
 
 # this really doesn't need to be updated except for major revision changes.

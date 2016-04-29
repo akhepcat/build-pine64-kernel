@@ -132,8 +132,11 @@ then
 fi
 
 sed -i "s/\(kernel_filename\)=.*/\1=${kb}\/Image/gi; s/\(initrd_filename\)=.*/\1=${kb}\/initrd.img/gi;" /boot/uEnv.txt
-[[ -z "$(grep fdt_filename_prefix /boot/uEnv.txt)" ]] \
-	&& sed -i "s/\(fdt_filename_prefix\)=.*/\1=${kb}\/sun50i-a64-/gi;" /boot/uEnv.txt \
-	|| echo "fdt_filename_prefix=${kb}/sun50i-a64-" >> /boot/uEnv.txt
+if [ -z "$(grep fdt_filename_prefix /boot/uEnv.txt)" ]
+then
+	sed -i "s/\(fdt_filename_prefix\)=.*/\1=${kb}\/sun50i-a64-/gi;" /boot/uEnv.txt
+else
+	echo "fdt_filename_prefix=${kb}/sun50i-a64-" >> /boot/uEnv.txt
+fi
 
 echo "completed"

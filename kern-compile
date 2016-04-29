@@ -100,7 +100,7 @@ fi
 kver=$( make kernelrelease )
 kb=${kver//\./}
 kb=${kb//-pine64}
-kb=${kb//-/.}
+kb="k0${kb//-/.}"
 
 test -e .config && cp .config /usr/src/config-pine64-${kver}-${DATE}
 
@@ -111,7 +111,7 @@ then
 	read waiting
 fi
 
-mkdir /boot/k0${kb}
+mkdir /boot/${kb}
 FREE=$(df -k /boot/ | awk '/boot/ {print $4}')
 if [ ${FREE:-0} -lt 20000 ]
 then
@@ -119,9 +119,9 @@ then
 	read waiting
 fi
 
-cp arch/arm64/boot/dts/sun50i-a64-pine64-plus.dtb arch/arm64/boot/Image /boot/k0${kb}/
-update-initramfs -c -k ${kver} -b /boot/k0${kb}/
-mv /boot/k0${kb}/initrd.img-${kver} /boot/k0${kb}/initrd.img
+cp arch/arm64/boot/dts/sun50i-a64-pine64-plus.dtb arch/arm64/boot/Image /boot/${kb}/
+update-initramfs -c -k ${kver} -b /boot/${kb}/
+mv /boot/${kb}/initrd.img-${kver} /boot/${kb}/initrd.img
 
 ##  adjust the /boot/uEnv.txt
 

@@ -127,7 +127,7 @@ mv /boot/${kb}/initrd.img-${kver} /boot/${kb}/initrd.img
 
 if [ -e /boot/uEnv.txt ]
 then
-	echo "About to fixup /boot/uEnv.txt, ctrl-c to abort this auto-updating"
+	echo "About to fixup /boot/uEnv.txt, enter to continue, or ctrl-c to abort this auto-updating"
 	read waiting
 fi
 

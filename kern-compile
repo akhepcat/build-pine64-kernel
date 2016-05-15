@@ -3,6 +3,7 @@ DATE=$(date '+%Y%m%d%H%M')
 PROG="${0##*/}"
 ARGS="${*} default"
 DO_RETURN=${SHLVL}
+KBUILDD=/usr/src/linux-pine64
 
 trap do_exit SIGINT SIGTERM SIGKILL SIGQUIT SIGABRT SIGSTOP SIGSEGV
 
@@ -18,14 +19,14 @@ do_exit()
 
 cd /usr/src/
 
-if [ ! -e /usr/src/linux-pine64/.git/config ]
+if [ ! -e ${KBUILDD}/.git/config ]
 then
 	echo "no current linux repository, cloning may take some time."
 	git clone --depth 1 --single-branch -b pine64-hacks-1.2 https://github.com/longsleep/linux-pine64
 	ARGS="update"
 fi
 
-cd /usr/src/linux-pine64
+cd ${KBUILDD}
 
 if [ -z "${ARGS##*update*}" ]
 then
@@ -45,8 +46,8 @@ then
 	read waiting
 fi
 
-test -e /usr/src/linux-pine64/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts || \
-	curl -sSL https://github.com/longsleep/build-pine64-image/raw/master/blobs/pine64.dts > /usr/src/linux-pine64/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts
+test -e ${KBUILDD}/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts || \
+	curl -sSL https://github.com/longsleep/build-pine64-image/raw/master/blobs/pine64.dts > ${KBUILDD}/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts
 
 CPUS=$(grep processor /proc/cpuinfo | wc -l)
 if [ -z "${ARGS##*CPUS=*}" ]
@@ -64,12 +65,40 @@ then
    do_exit 1
 fi
 
+#we need this early, but only after a successful build.
+kver=$( make kernelrelease )
+kb=${kver//\./}
+kb=${kb//-pine64}
+kb="k0${kb//-/.}"
+
 make modules_install
 if [ 0 -ne $? ]
 then
    echo "Make (modules_install) broke.  fix and resume manually"
    do_exit 1
 fi
+
+cd ${KBUILDD}/modules/gpu
+LICHEE_KDIR=${KBUILDD} LICHEE_PLATFORM=Pine64 make -j${CPUS} build
+if [ 0 -ne $? ]
+then
+   echo "Make (gpu/mali400) broke.  fix and resume manually"
+   do_exit 1
+elif [ -e ${KBUILDD}/modules/gpu/mali400/kernel_mode/driver/src/devicedrv/mali/mali.ko ]
+then
+    mkdir -p /lib/modules/${kver}/kernel/extramodules
+    cp ${KBUILDD}/modules/gpu/mali400/kernel_mode/driver/src/devicedrv/mali/mali.ko /lib/modules/${kver}/kernel/extramodules
+    #re-depmod because we need to make sure this gets picked up
+    depmod ${kver}
+else
+    #something went wrong
+    echo "mali gpu module build looks successful, but no module was found at"
+    echo " ${KBUILDD}/modules/gpu/mali400/kernel_mode/driver/src/devicedrv/mali/mali.ko"
+    echo "Please resolve this issue manually in a subshell, then press enter to continue"
+    read waiting
+fi
+
+cd ${KBUILDD}
 make firmware_install
 if [ 0 -ne $? ]
 then
@@ -83,7 +112,7 @@ fi
 if [ -e /usr/include/linux/version.h ]
 then
 	OLDV=$(grep LINUX_VERSION_CODE /usr/include/linux/version.h | awk '{print $3}')
-	NEWV=$(grep LINUX_VERSION_CODE /usr/src/linux-pine64/include/generated/uapi/linux/version.h | awk '{print $3}')
+	NEWV=$(grep LINUX_VERSION_CODE ${KBUILDD}/include/generated/uapi/linux/version.h | awk '{print $3}')
 	DIFF=$(( ${NEWV:-0} - ${OLDV:-0} ))
 	#negatives mean older, but bash math, so normalize to zero.
 	DIFF=${DIFF##-*}
@@ -96,11 +125,6 @@ else
 	# if there's no linux include directory, we install it forcefully
 	make headers_install INSTALL_HDR_PATH=/usr
 fi
-
-kver=$( make kernelrelease )
-kb=${kver//\./}
-kb=${kb//-pine64}
-kb="k0${kb//-/.}"
 
 test -e .config && cp .config /usr/src/config-pine64-${kver}-${DATE}
 

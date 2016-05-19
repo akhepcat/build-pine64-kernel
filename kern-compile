@@ -3,7 +3,7 @@ DATE=$(date '+%Y%m%d%H%M')
 PROG="${0##*/}"
 ARGS="${*} default"
 DO_RETURN=${SHLVL}
-KBUILDD=/usr/src/linux-pine64
+KBUILDD=${KBUILDD:-/usr/src/linux-pine64}
 
 trap do_exit SIGINT SIGTERM SIGKILL SIGQUIT SIGABRT SIGSTOP SIGSEGV
 
@@ -19,25 +19,31 @@ do_exit()
 
 cd /usr/src/
 
-if [ ! -e ${KBUILDD}/.git/config ]
+# unless we've forced a different location by supplying the KBUILDD differently via cmdline, check for git-ness..
+if [ "${KBUILDD}" = "/usr/src/linux-pine64" ]
 then
-	echo "no current linux repository, cloning may take some time."
-	git clone --depth 1 --single-branch -b pine64-hacks-1.2 https://github.com/longsleep/linux-pine64
-	ARGS="update"
-fi
+	if [ ! -e ${KBUILDD}/.git/config ]
+	then
+		echo "no current linux repository, cloning may take some time."
+		git clone --depth 1 --single-branch -b pine64-hacks-1.2 https://github.com/longsleep/linux-pine64
+		ARGS="update"
+	fi
 
-cd ${KBUILDD}
+	cd ${KBUILDD}
 
-if [ -z "${ARGS##*update*}" ]
-then
-	make mrproper
-	git pull
+	if [ -z "${ARGS##*update*}" ]
+	then
+		make mrproper
+		git pull
+	
+		echo "ctrl-z, run 'git checkout -b \${branch}' here, then fg and 'enter' to continue."
+		read waiting
 
-	echo "ctrl-z, run 'git checkout -b \${branch}' here, then fg and 'enter' to continue."
-	read waiting
-
+	else
+		echo "skipping update ('$0 update' to force a new kernel) and starting to build"
+	fi
 else
-	echo "skipping update ('$0 update' to force a new kernel) and starting to build"
+	cd ${KBUILDD}
 fi
 
 if [ ! -e ".config" ]

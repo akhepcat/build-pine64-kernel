@@ -32,7 +32,7 @@ fi
 KBUILDD=${KBUILDD:-/usr/src/$GIT_DIR}
 
 # unless we've forced a different location by supplying the KBUILDD differently via cmdline, check for git-ness..
-if [ "${KBUILDD}" = "/usr/src/linux-pine64" -o "${KBUILDD}" = "/usr/src/linux-mainline"]
+if [ "${KBUILDD}" = "/usr/src/linux-pine64" -o "${KBUILDD}" = "/usr/src/linux-mainline" ]
 then
 	if [ ! -e ${KBUILDD}/.git/config ]
 	then
@@ -80,7 +80,13 @@ then
 	CPUS=${CPUS//[^0-9]/}
 fi
 
-make -j${CPUS} Image sun50i-a64-pine64-plus.dtb modules
+if [ ${MAINLINE:-0} -eq 0 ]
+then
+	DTBS=sun50i-a64-pine64-plus.dtb
+else
+	DTBS=dtbs
+fi
+make -j${CPUS} Image ${DTBS} modules
 
 if [ 0 -ne $? ]
 then

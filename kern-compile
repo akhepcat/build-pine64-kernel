@@ -3,7 +3,7 @@ DATE=$(date '+%Y%m%d%H%M')
 PROG="${0##*/}"
 ARGS="${*} default"
 DO_RETURN=${SHLVL}
-KBUILDD=${KBUILDD:-/usr/src/linux-pine64}
+MAINLINE=0
 
 trap do_exit SIGINT SIGTERM SIGKILL SIGQUIT SIGABRT SIGSTOP SIGSEGV
 
@@ -18,14 +18,26 @@ do_exit()
 }
 
 cd /usr/src/
+if [ ${MAINLINE:-0} -eq 0 ];
+then
+	GIT_DIR=linux-pine64
+	GIT_URL=https://github.com/longsleep/linux-pine64
+	GIT_BRANCH=pine64-hacks-1.2
+else
+	GIT_DIR=linux-mainline
+	GIT_URL=https://github.com/apritzel/linux
+	GIT_BRANCH=a64-v5
+fi
+#Unless forced at runtime, default to our GIT_DIR in /usr/src...
+KBUILDD=${KBUILDD:-/usr/src/$GIT_DIR}
 
 # unless we've forced a different location by supplying the KBUILDD differently via cmdline, check for git-ness..
-if [ "${KBUILDD}" = "/usr/src/linux-pine64" ]
+if [ "${KBUILDD}" = "/usr/src/linux-pine64" -o "${KBUILDD}" = "/usr/src/linux-mainline"]
 then
 	if [ ! -e ${KBUILDD}/.git/config ]
 	then
 		echo "no current linux repository, cloning may take some time."
-		git clone --depth 1 --single-branch -b pine64-hacks-1.2 https://github.com/longsleep/linux-pine64
+		git clone --depth 1 --single-branch -b ${GIT_BRANCH} ${GIT_URL} ${GIT_DIR}
 		ARGS="update"
 	fi
 
@@ -44,6 +56,8 @@ then
 	fi
 else
 	cd ${KBUILDD}
+	echo "manually supplied repository directory.  ctrl-z, do your git-updates, then fg and 'enter' to continue."
+	read waiting
 fi
 
 if [ ! -e ".config" ]
@@ -52,8 +66,11 @@ then
 	read waiting
 fi
 
-test -e ${KBUILDD}/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts || \
-	curl -sSL https://github.com/longsleep/build-pine64-image/raw/master/blobs/pine64.dts > ${KBUILDD}/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts
+if [ "${GIT_DIR}" != "linux-mainline" ]
+then
+	test -e ${KBUILDD}/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts || \
+		curl -sSL https://github.com/longsleep/build-pine64-image/raw/master/blobs/pine64.dts > ${KBUILDD}/arch/arm64/boot/dts/sun50i-a64-pine64-plus.dts
+fi
 
 CPUS=$(grep processor /proc/cpuinfo | wc -l)
 if [ -z "${ARGS##*CPUS=*}" ]
@@ -100,7 +117,7 @@ else
     #something went wrong
     echo "mali gpu module build looks successful, but no module was found at"
     echo " ${KBUILDD}/modules/gpu/mali400/kernel_mode/driver/src/devicedrv/mali/mali.ko"
-    echo "Please resolve this issue manually in a subshell, then press enter to continue"
+    echo "Please resolve this issue manually in a subshell, then fg and press 'enter' to continue"
     read waiting
 fi
 
